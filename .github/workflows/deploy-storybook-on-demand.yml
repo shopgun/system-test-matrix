@@ -31,43 +31,7 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      #
-      # Prepare the environment and let the requestor know we've accepted the command
-      #
-      - name: Acknowledge command
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const owner = context.payload.organization.login;
-            const repo = context.payload.repository.name;
-            const comment_id = context.payload.comment.id;
-
-            github.rest.reactions.createForIssueComment({
-                owner,
-                repo,
-                comment_id,
-                content: '+1'
-            });
-
-            const { data: pull_request } = await github.rest.pulls.get({
-                owner,
-                repo,
-                pull_number: context.payload.issue.number,
-            });
-
-            const folder = /^\/deploy storybook as ([a-z0-9_-]+)\b/i.test(
-                  context.payload.comment.body
-              ) ?
-                  RegExp.$1 :
-                  pull_request.head.sha;
-
-            core.exportVariable('GITHUB_PR', pull_request.number);
-            core.exportVariable('GITHUB_PR_HEAD_SHA', pull_request.head.sha);
-            core.exportVariable('S3_FOLDER', folder);
-
-      #
-      # Checkout the repository.
-      #
+    
       - name: Checkout project
         uses: actions/checkout@v3
         with:
