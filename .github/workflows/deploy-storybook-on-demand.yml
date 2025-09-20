@@ -1,18 +1,5 @@
-#
-# This workflow runs when a comment starting with "/deploy storybook"
-# is created or edited on a pull request (note: not a review comment).
-#
-# The storybook is built from the HEAD of the pull request branch (i.e. the latest commit).
-#
-# If the build is successfull, results are uploaded to S3 and a link is posed as a new comment.
-# In case of a failure, a new comment with link to workflow run results will be posted.
-#
-# Usage notes:
-#
-#   /deploy storybook             - uses latest commit's hash for S3 folder name (preferred)
-#   /deploy storybook as <name>   - uses <name> for S3 folder name
-#
 name: On-demand Storybook deployment
+
 on:
   issue_comment:
     types: [created, edited]
@@ -31,30 +18,31 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      #
-      # Prepare the environment and let the requestor know we've accepted the command
-      #
+      # --- Acknowledge command and set env variables ---
       - name: Acknowledge command
         uses: actions/github-script@v6
         with:
           script: |
-            const owner = context.payload.organization.login;
+            const owner = context.payload.repository.owner.login; // fixed
             const repo = context.payload.repository.name;
             const comment_id = context.payload.comment.id;
 
-            github.rest.reactions.createForIssueComment({
+            // Add reaction to comment
+            await github.rest.reactions.createForIssueComment({
                 owner,
                 repo,
                 comment_id,
                 content: '+1'
             });
 
+            // Get pull request info
             const { data: pull_request } = await github.rest.pulls.get({
                 owner,
                 repo,
                 pull_number: context.payload.issue.number,
             });
 
+            // Determine S3 folder name
             const folder = /^\/deploy storybook as ([a-z0-9_-]+)\b/i.test(
                   context.payload.comment.body
               ) ?
@@ -65,31 +53,24 @@ jobs:
             core.exportVariable('GITHUB_PR_HEAD_SHA', pull_request.head.sha);
             core.exportVariable('S3_FOLDER', folder);
 
-      #
-      # Checkout the repository.
-      #
+      # --- Checkout repository from PR head ---
       - name: Checkout project
         uses: actions/checkout@v3
         with:
           ref: ${{ env.GITHUB_PR_HEAD_SHA }}
 
-      #
-      # Install dependencies and build Storybook
-      #
+      # --- Install dependencies and build Storybook ---
       - name: Install dependencies
         run: yarn install --frozen-lockfile && yarn build-storybook
         working-directory: ./frontend
 
-      #
-      # Upload storybook-static to S3
-      #
+      # --- Upload storybook-static to S3 ---
       - name: Upload to S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           declare -A type
-
           type[html]=text/html
           type[css]=text/css
           type[js]=application/javascript
@@ -118,20 +99,18 @@ jobs:
           done
         working-directory: ./frontend
 
-      #
-      # Post a comment with result URL
-      #
+      # --- Post success comment ---
       - name: Post success result
         if: success()
         uses: actions/github-script@v6
         with:
           script: |
-            const owner = context.payload.organization.login;
+            const owner = context.payload.repository.owner.login;
             const repo = context.payload.repository.name;
             const comment_id = context.payload.comment.id;
             const requestor = context.payload.comment.user.login;
 
-            github.rest.reactions.createForIssueComment({
+            await github.rest.reactions.createForIssueComment({
                 owner,
                 repo,
                 comment_id,
@@ -140,7 +119,7 @@ jobs:
 
             const url = `${process.env.PUBLIC_URL}/${process.env.S3_FOLDER}`;
             const body = `@${requestor} here is your requested Storybook deployment:\n\n` +
-                  `:rocket: [${url}](${url})`
+                  `:rocket: [${url}](${url})`;
 
             await github.rest.issues.createComment({
               owner,
@@ -149,20 +128,18 @@ jobs:
               body,
             });
 
-      #
-      # Post a comment informing of the failure
-      #
+      # --- Post failure comment ---
       - name: Post failure information
         if: failure()
         uses: actions/github-script@v6
         with:
           script: |
-            const owner = context.payload.organization.login;
+            const owner = context.payload.repository.owner.login;
             const repo = context.payload.repository.name;
             const comment_id = context.payload.comment.id;
             const requestor = context.payload.comment.user.login;
 
-            github.rest.reactions.createForIssueComment({
+            await github.rest.reactions.createForIssueComment({
               owner,
               repo,
               comment_id,
