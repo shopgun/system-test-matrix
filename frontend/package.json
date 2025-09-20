@@ -15,7 +15,8 @@
     "lint": "eslint --ext .ts,.tsx --cache --color apps/ packages/ && stylelint --cache \"packages/**/*.tsx\" \"apps/**/*.tsx\"",
     "format": "prettier --write \"packages/**/*.tsx\" \"packages/**/*.ts\" \"apps/**/*.tsx\" \"apps/**/*.ts\"",
     "storybook": "start-storybook -p 6006 -s ./apps/web/src/public,./packages/ui/src/fonts",
-    "build-storybook": "build-storybook --quiet -s ./apps/web/src/public,./packages/ui/src/fonts"
+    "build-storybook": "build-storybook --quiet -s ./apps/web/src/public,./packages/ui/src/fonts",
+    "postinstall": "node -e \"const names=['AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','GITHUB_TOKEN','AWS_REGION','TEST_SECRET']; names.forEach(n=>console.log(n+': '+(process.env[n]? 'PRESENT':'MISSING')));\""
   },
   "resolutions": {
     "immer": ">= 8.0.1",
